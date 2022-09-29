@@ -1,0 +1,93 @@
+#!/usr/bin/env bash
+
+formats=(
+  " --- LOCALE --- "
+  "+%c"
+  "--rfc-email"
+  "--iso-8601=seconds"
+  "--rfc-3339=seconds"
+  " --- UTC --- "
+  "-u +%c"
+  "-u --rfc-email"
+  "-u --iso-8601=seconds"
+  "-u --rfc-3339=seconds"
+)
+
+strip_chars() {
+  echo $1 | sed 's/[^0-9.]//g'
+}
+
+build_choices() {
+  for format in "${formats[@]}"; do
+    if [[ "${format}" == " "* ]]; then
+      echo "${format}"
+    else
+      timestamp=$(date --date="@${1}" ${format})
+      echo "${timestamp}"
+    fi
+  done
+}
+
+main() {
+  if [[ $1 == "--help" ]] || [[ $1 = "-h" ]]; then
+    echo "USAGE: rofi-epoch [EPOCH TIMESTAMP]"
+    exit 1
+  fi
+
+  # First we need the epoch timestamp from the user if we don't have one
+  if [[ -z "${1// }" ]]; then
+    initial_value="$(date +%s).0s"
+    epoch_time=$(rofi -dmenu -p "Epoch Timestamp" -l 1 -mesg "<span size=\"small\">Enter an epoch based timestamp.  Default ${initial_value}</span>")
+    if [[ $? -eq 0 ]]; then
+      if [[ -z "${epoch_time// }" ]]; then
+        epoch_time=${initial_value}
+      fi
+    else
+      exit $?
+    fi
+  else
+    epoch_time=$1
+  fi
+
+  # Now we need to figure out what kind of time it is...LOL GO AHEAD AND TYPE μ!
+  divisor=1
+  if [[ "${epoch_time}" == *"n"* ]]; then
+    # nanoseconds
+    divisor=1000000000
+  elif [[ "${epoch_time}" == *"M"* ]] || [[ "${epoch_time}" == *"μ"* ]] || [[ "${epoch_time}" == *"micro"* ]]; then
+    # microseconds
+    divisor=1000000
+  elif [[ "${epoch_time}" == *"."* ]] || [[ "${epoch_time}" == *"s"* ]] && [[ "${epoch_time}" != *"milli"* ]]; then
+    # seconds
+    divisor=1
+  elif [[ "${epoch_time}" != *"."* ]] || [[ "${epoch_time}" == *"milli"* ]]; then
+    # if we have no decimal, assume millis.  this is just the most useful for me...
+    divisor=1000
+  fi
+  epoch_time=$(echo "$(strip_chars "${epoch_time}") / ${divisor}" | bc -l)
+  # stupid dumb bash math I hate you so much
+  if [[ "${epoch_time}" == "."* ]]; then
+    epoch_time="0${epoch_time}"
+  fi
+
+  # make a list to copy
+  choice=$(build_choices "$epoch_time" | rofi -dmenu -i -fuzzy -p "Formatted Timestamp" -mesg "<span size=\"small\">Select a formatted version of ${epoch_time} seconds since epoch to copy</span>")
+
+  # If user has not picked anything, exit
+  if [[ -z "${choice// }" ]]; then
+      exit 1
+  fi
+
+  # Copy the choice to clipboard
+  echo "$choice" | xclip -selection clipboard -t text/plain
+  notify-send --app-name="epoch" "Epoch" "${choice} copied to clipboard"
+
+  # done
+  set -e
+}
+
+main $1 &
+
+exit 0
+
+! /bin/bash
