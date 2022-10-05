@@ -5,12 +5,12 @@ formats=(
   "+%c"
   "--rfc-email"
   "--iso-8601=seconds"
-  "--rfc-3339=seconds"
   " --- UTC --- "
   "-u +%c"
   "-u --rfc-email"
   "-u --iso-8601=seconds"
-  "-u --rfc-3339=seconds"
+  " --- Seconds --- "
+  "+%s"
 )
 
 strip_chars() {
@@ -57,8 +57,12 @@ main() {
   elif [[ "${epoch_time}" == *"M"* ]] || [[ "${epoch_time}" == *"μ"* ]] || [[ "${epoch_time}" == *"micro"* ]]; then
     # microseconds
     divisor=1000000
-  elif [[ "${epoch_time}" == *"."* ]] || [[ "${epoch_time}" == *"s"* ]] && [[ "${epoch_time}" != *"milli"* ]]; then
+  elif [[ "${epoch_time}" == *"."* ]] || [[ "${epoch_time}" == *"s"* ]] && [[ "${epoch_time}" != *"milli"* ]] && [[ "${epoch_time}" != *"T"* ]]; then
     # seconds
+    divisor=1
+  elif [[ "${epoch_time}" == *"T"* ]]; then
+    # iso-8601
+    epoch_time=$(date --date="${epoch_time}" +%s)
     divisor=1
   elif [[ "${epoch_time}" != *"."* ]] || [[ "${epoch_time}" == *"milli"* ]]; then
     # if we have no decimal, assume millis.  this is just the most useful for me...
